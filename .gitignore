@@ -1,0 +1,5 @@
+/target
+# castsvg is a binary crate, so Cargo.lock IS committed (not ignored).
+*.svg
+!examples/demo.svg
+examples/preview.html
