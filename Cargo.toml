@@ -1,6 +1,6 @@
 [package]
 name = "castsvg"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Record terminal sessions and render them as self-contained animated SVG — a single static binary, no Node or Python runtime."
 license = "MIT"

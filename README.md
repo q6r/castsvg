@@ -5,7 +5,9 @@
 [![npm](https://img.shields.io/npm/v/castsvg.svg)](https://www.npmjs.com/package/castsvg)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Record a terminal session, get a self-contained animated SVG.** One static Rust binary — no Node, no Python, no runtime, no external player. The output is a plain `.svg` that loops forever and drops straight into a README, a docs page, or an email.
+**Record a terminal session, get a self-contained animated SVG.** One static Rust binary — no Node, no Python, no JS player, no ffmpeg, no runtime of any kind. The output is a plain `.svg` that loops forever and drops straight into a README, a docs page, or an email.
+
+Full-screen TUIs like **`vim`, `htop`, `lazygit` and `k9s`** record correctly too — still as a single standalone SVG.
 
 <p align="center">
   <img src="examples/demo.svg" alt="castsvg demo" width="640">
@@ -87,13 +89,18 @@ castsvg render demo.cast -o demo.svg --theme light --font-size 16
 
 The result needs nothing but an SVG renderer — i.e. any browser, or GitHub's own Markdown.
 
+## What's supported
+
+- **16 / 256 / truecolor** SGR, **bold**, and **inverse**.
+- **Alternate screen buffer** — full-screen TUIs (`vim`, `htop`, `less`, `lazygit`, `k9s`, …) render on their own buffer and leave the primary scrollback untouched, so exiting the TUI restores the terminal exactly as it was.
+- **Line-oriented output** — prompts, logs, build output, progress bars (`\r` redraws), scrolling.
+
 ## Limitations
 
 Honest about scope — it renders the common cases well, not every escape sequence:
 
-- 16 / 256 / truecolor SGR, bold, and inverse are supported. Underline, italics, and blink are not (yet).
-- The alternate screen buffer (full-screen TUIs like `vim`, `htop`) is treated as the normal buffer — line-oriented output is the sweet spot.
-- Cursor is not drawn as a blinking block (a static inverse cell works via `\e[7m`).
+- Underline, italics, and blink SGR attributes are not styled (yet).
+- The cursor is not drawn as a blinking block (a static inverse cell works via `\e[7m`).
 
 PRs for any of these are welcome.
 

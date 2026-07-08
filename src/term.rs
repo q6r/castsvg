@@ -109,6 +109,21 @@ impl Grid {
     fn snapshot(&self) -> Vec<Cell> {
         self.cells.clone()
     }
+
+    /// Reset for entering the alternate screen: default pen, cursor home, and a
+    /// fully blanked grid (so a fresh TUI starts on a clean slate).
+    fn enter_reset(&mut self) {
+        self.fg = Color::Default;
+        self.bg = Color::Default;
+        self.bold = false;
+        self.inverse = false;
+        self.cx = 0;
+        self.cy = 0;
+        let blank = Cell::default();
+        for cell in &mut self.cells {
+            *cell = blank;
+        }
+    }
 }
 
 /// Read the primary value of the nth CSI parameter, treating 0/absent as `def`.
@@ -122,7 +137,7 @@ fn param(params: &Params, idx: usize, def: usize) -> usize {
         .unwrap_or(def)
 }
 
-impl Perform for Grid {
+impl Grid {
     fn print(&mut self, c: char) {
         if self.cx >= self.cols {
             self.cx = 0;
@@ -160,11 +175,9 @@ impl Perform for Grid {
         }
     }
 
-    fn csi_dispatch(&mut self, params: &Params, intermediates: &[u8], _ignore: bool, action: char) {
-        // Ignore private-mode sequences (e.g. `?25l` hide cursor, alt screen).
-        if intermediates.first() == Some(&b'?') {
-            return;
-        }
+    /// Handle a non-private CSI sequence. Private-mode sequences (alt screen,
+    /// cursor visibility, …) are intercepted upstream by `Terminal`.
+    fn csi(&mut self, params: &Params, action: char) {
         match action {
             'H' | 'f' => {
                 self.cy = (param(params, 0, 1) - 1).min(self.rows - 1);
@@ -271,6 +284,108 @@ impl Grid {
     }
 }
 
+/// A terminal with a primary and an alternate screen buffer.
+///
+/// Full-screen TUIs (`vim`, `htop`, `less`, `lazygit`, `k9s`, …) switch to the
+/// alternate buffer via `CSI ? 1049 h` and switch back with `… 1049 l`. Keeping
+/// the two buffers separate means their output never pollutes the primary
+/// scrollback, and leaving a TUI restores the terminal exactly as it was.
+struct Terminal {
+    primary: Grid,
+    alternate: Grid,
+    alt_active: bool,
+    /// Cursor saved on entering the alternate screen (DECSC-style), restored on
+    /// leaving it.
+    saved_cursor: (usize, usize),
+}
+
+impl Terminal {
+    fn new(cols: usize, rows: usize) -> Terminal {
+        Terminal {
+            primary: Grid::new(cols, rows),
+            alternate: Grid::new(cols, rows),
+            alt_active: false,
+            saved_cursor: (0, 0),
+        }
+    }
+
+    fn active(&self) -> &Grid {
+        if self.alt_active {
+            &self.alternate
+        } else {
+            &self.primary
+        }
+    }
+
+    fn active_mut(&mut self) -> &mut Grid {
+        if self.alt_active {
+            &mut self.alternate
+        } else {
+            &mut self.primary
+        }
+    }
+
+    /// The currently visible screen — this is what gets rendered.
+    fn snapshot(&self) -> Vec<Cell> {
+        self.active().snapshot()
+    }
+
+    fn enter_alt(&mut self) {
+        if self.alt_active {
+            return;
+        }
+        self.saved_cursor = (self.primary.cx, self.primary.cy);
+        self.alt_active = true;
+        self.alternate.enter_reset();
+    }
+
+    fn leave_alt(&mut self) {
+        if !self.alt_active {
+            return;
+        }
+        self.alt_active = false;
+        // The primary buffer was untouched while the TUI ran; just put the
+        // cursor back where it was.
+        let (cx, cy) = self.saved_cursor;
+        self.primary.cx = cx.min(self.primary.cols.saturating_sub(1));
+        self.primary.cy = cy.min(self.primary.rows.saturating_sub(1));
+    }
+}
+
+impl Perform for Terminal {
+    fn print(&mut self, c: char) {
+        self.active_mut().print(c);
+    }
+
+    fn execute(&mut self, byte: u8) {
+        self.active_mut().execute(byte);
+    }
+
+    fn csi_dispatch(&mut self, params: &Params, intermediates: &[u8], _ignore: bool, action: char) {
+        if intermediates.first() == Some(&b'?') {
+            // Private modes. We act on the alternate-screen family; the rest
+            // (cursor visibility `25`, bracketed paste `2004`, …) are ignored.
+            if action == 'h' || action == 'l' {
+                let set = action == 'h';
+                for p in params.iter() {
+                    match p.first().copied() {
+                        Some(1049) | Some(1047) | Some(47) => {
+                            if set {
+                                self.enter_alt();
+                            } else {
+                                self.leave_alt();
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            return;
+        }
+        self.active_mut().csi(params, action);
+    }
+}
+
 /// Replay a cast and slice it into animation frames.
 ///
 /// * `min_frame_ms` coalesces bursts of output that are closer together than a
@@ -279,11 +394,11 @@ impl Grid {
 /// * `idle_cap_ms` compresses long pauses so a recording where you paused to
 ///   think doesn't produce a 30-second dead SVG.
 pub fn build_model(cast: &Cast, min_frame_ms: f64, idle_cap_ms: f64, end_pause_ms: f64) -> Model {
-    let mut grid = Grid::new(cast.width, cast.height);
+    let mut term = Terminal::new(cast.width, cast.height);
     let mut parser = Parser::new();
 
     // Pass 1: replay, taking a snapshot after each event on a remapped clock.
-    let mut snaps: Vec<(f64, Vec<Cell>)> = vec![(0.0, grid.snapshot())];
+    let mut snaps: Vec<(f64, Vec<Cell>)> = vec![(0.0, term.snapshot())];
     let mut clock = 0.0_f64;
     let mut last_real = 0.0_f64;
     for ev in &cast.events {
@@ -291,9 +406,9 @@ pub fn build_model(cast: &Cast, min_frame_ms: f64, idle_cap_ms: f64, end_pause_m
         last_real = ev.time;
         clock += delta.min(idle_cap_ms / 1000.0);
         for &byte in ev.data.as_bytes() {
-            parser.advance(&mut grid, byte);
+            parser.advance(&mut term, byte);
         }
-        snaps.push((clock * 1000.0, grid.snapshot()));
+        snaps.push((clock * 1000.0, term.snapshot()));
     }
 
     // Pass 2: coalesce snapshots closer than min_frame_ms into one frame.
@@ -328,22 +443,29 @@ pub fn build_model(cast: &Cast, min_frame_ms: f64, idle_cap_ms: f64, end_pause_m
 mod tests {
     use super::*;
 
-    /// Feed raw bytes through the emulator and return the final grid.
-    fn run(cols: usize, rows: usize, bytes: &[u8]) -> Grid {
-        let mut grid = Grid::new(cols, rows);
+    /// Feed raw bytes through the emulator and return the terminal.
+    fn run(cols: usize, rows: usize, bytes: &[u8]) -> Terminal {
+        let mut term = Terminal::new(cols, rows);
         let mut parser = Parser::new();
         for &b in bytes {
-            parser.advance(&mut grid, b);
+            parser.advance(&mut term, b);
         }
-        grid
+        term
     }
 
-    fn text_at(grid: &Grid, row: usize) -> String {
+    /// Text of a row on the currently visible (active) screen.
+    fn text_at(term: &Terminal, row: usize) -> String {
+        let grid = term.active();
         (0..grid.cols)
             .map(|c| grid.cells[row * grid.cols + c].ch)
             .collect::<String>()
             .trim_end()
             .to_string()
+    }
+
+    /// Cell on the active screen, for attribute assertions.
+    fn cell_at(term: &Terminal, idx: usize) -> Cell {
+        term.active().cells[idx]
     }
 
     #[test]
@@ -361,15 +483,15 @@ mod tests {
 
     #[test]
     fn sgr_sets_foreground() {
-        let g = run(10, 1, b"\x1b[31mR");
-        assert_eq!(g.cells[0].ch, 'R');
-        assert_eq!(g.cells[0].fg, Color::Indexed(1));
+        let t = run(10, 1, b"\x1b[31mR");
+        assert_eq!(cell_at(&t, 0).ch, 'R');
+        assert_eq!(cell_at(&t, 0).fg, Color::Indexed(1));
     }
 
     #[test]
     fn truecolor_fg_is_parsed() {
-        let g = run(10, 1, b"\x1b[38;2;10;20;30mX");
-        assert_eq!(g.cells[0].fg, Color::Rgb(10, 20, 30));
+        let t = run(10, 1, b"\x1b[38;2;10;20;30mX");
+        assert_eq!(cell_at(&t, 0).fg, Color::Rgb(10, 20, 30));
     }
 
     #[test]
@@ -381,9 +503,36 @@ mod tests {
 
     #[test]
     fn linefeed_scrolls_when_past_bottom() {
-        let g = run(4, 2, b"top\r\nmid\r\nbot");
+        let t = run(4, 2, b"top\r\nmid\r\nbot");
         // Only two rows: "top" scrolled off, leaving "mid" then "bot".
-        assert_eq!(text_at(&g, 0), "mid");
-        assert_eq!(text_at(&g, 1), "bot");
+        assert_eq!(text_at(&t, 0), "mid");
+        assert_eq!(text_at(&t, 1), "bot");
+    }
+
+    #[test]
+    fn alt_screen_shows_alt_content_while_active() {
+        // Enter the alternate buffer (as vim/htop do) and draw into it — the
+        // visible screen is the alt content, not the primary.
+        let t = run(10, 2, b"home\x1b[?1049hVIM");
+        assert!(t.alt_active);
+        assert_eq!(text_at(&t, 0), "VIM");
+    }
+
+    #[test]
+    fn alt_screen_isolates_and_restores_primary() {
+        // home -> open TUI -> scribble junk -> close TUI. The final visible
+        // screen must be the untouched primary ("home"), not the TUI's junk.
+        let t = run(10, 2, b"home\x1b[?1049hJUNK JUNK\x1b[?1049l");
+        assert!(!t.alt_active);
+        assert_eq!(text_at(&t, 0), "home");
+        assert_eq!(text_at(&t, 1), "");
+    }
+
+    #[test]
+    fn alt_screen_clears_between_sessions() {
+        // Re-entering the alt buffer starts clean — no leftovers from last time.
+        let t = run(10, 2, b"\x1b[?1049hFIRST\x1b[?1049l\x1b[?1049h");
+        assert!(t.alt_active);
+        assert_eq!(text_at(&t, 0), "");
     }
 }

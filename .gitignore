@@ -2,6 +2,7 @@
 # castsvg is a binary crate, so Cargo.lock IS committed (not ignored).
 *.svg
 !examples/demo.svg
+!examples/altscreen.svg
 examples/preview.html
 
 # npm wrapper: the native binary is downloaded at install time, never committed.

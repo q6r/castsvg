@@ -1,0 +1,12 @@
+{"version":2,"width":54,"height":9,"env":{"TERM":"xterm-256color"}}
+[0.20, "o", "\u001b[1;32muser@rust\u001b[0m:\u001b[1;34m~/proj\u001b[0m$ ls\r\n"]
+[0.40, "o", "Cargo.toml  src/  README.md\r\n"]
+[0.70, "o", "\u001b[1;32muser@rust\u001b[0m:\u001b[1;34m~/proj\u001b[0m$ vim src/main.rs\r\n"]
+[1.20, "o", "\u001b[?1049h\u001b[2J\u001b[H"]
+[1.30, "o", "\u001b[44m\u001b[97m  GNU nano-ish / vim               src/main.rs \u001b[0m\r\n"]
+[1.40, "o", "\r\n  \u001b[36m1\u001b[0m  fn main() {\r\n"]
+[1.50, "o", "  \u001b[36m2\u001b[0m      println!(\"hello\");\r\n"]
+[1.60, "o", "  \u001b[36m3\u001b[0m  }\r\n"]
+[1.70, "o", "\u001b[7m -- INSERT --                              \u001b[0m"]
+[3.20, "o", "\u001b[?1049l"]
+[3.40, "o", "\u001b[1;32muser@rust\u001b[0m:\u001b[1;34m~/proj\u001b[0m$ \u001b[7m \u001b[0m"]

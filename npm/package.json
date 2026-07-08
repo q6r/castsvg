@@ -1,6 +1,6 @@
 {
   "name": "castsvg",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Record terminal sessions and render them as self-contained animated SVG. This npm package downloads the prebuilt castsvg binary (written in Rust) for your platform — no Node runtime baggage, same single static binary.",
   "bin": {
     "castsvg": "bin/castsvg.js"
