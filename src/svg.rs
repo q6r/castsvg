@@ -65,38 +65,6 @@ fn indexed_hex(n: u8) -> String {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn palette_anchors() {
-        // Known fixed points of the xterm 256-colour cube.
-        assert_eq!(indexed_hex(0), "#000000");
-        assert_eq!(indexed_hex(15), "#ffffff");
-        assert_eq!(indexed_hex(16), "#000000"); // cube origin
-        assert_eq!(indexed_hex(231), "#ffffff"); // cube corner
-        assert_eq!(indexed_hex(196), "#ff0000"); // pure red in the cube
-        assert_eq!(indexed_hex(232), "#080808"); // first grey ramp step
-        assert_eq!(indexed_hex(255), "#eeeeee"); // last grey ramp step
-    }
-
-    #[test]
-    fn inverse_swaps_fg_and_bg() {
-        let theme = Theme::from_name("dark").unwrap();
-        let cell = Cell {
-            ch: 'x',
-            fg: Color::Indexed(1),
-            bg: Color::Default,
-            bold: false,
-            inverse: true,
-        };
-        let (fg, bg) = cell_colors(&cell, &theme);
-        assert_eq!(fg, theme.bg); // default bg becomes the text colour
-        assert_eq!(bg, indexed_hex(1)); // red becomes the background
-    }
-}
-
 fn resolve(color: Color, is_fg: bool, theme: &Theme) -> String {
     match color {
         Color::Default => {
@@ -177,7 +145,12 @@ pub fn render(model: &Model, opts: &Options) -> String {
     let height = model.rows as f64 * lh + 2.0 * pad;
     let theme = &opts.theme;
 
-    let total_ms: f64 = model.frames.iter().map(|f| f.duration_ms).sum::<f64>().max(1.0);
+    let total_ms: f64 = model
+        .frames
+        .iter()
+        .map(|f| f.duration_ms)
+        .sum::<f64>()
+        .max(1.0);
     let total_s = total_ms / 1000.0;
 
     let mut svg = String::new();
@@ -298,7 +271,11 @@ fn render_frame(
             if !has_glyph {
                 continue;
             }
-            let weight = if cur_bold { r#" font-weight="bold""# } else { "" };
+            let weight = if cur_bold {
+                r#" font-weight="bold""#
+            } else {
+                ""
+            };
             let _ = write!(
                 svg,
                 r#"<text x="{:.2}" y="{:.2}" fill="{}" textLength="{:.2}" lengthAdjust="spacingAndGlyphs"{}>"#,
@@ -311,5 +288,37 @@ fn render_frame(
             escape(&text, svg);
             svg.push_str("</text>");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn palette_anchors() {
+        // Known fixed points of the xterm 256-colour cube.
+        assert_eq!(indexed_hex(0), "#000000");
+        assert_eq!(indexed_hex(15), "#ffffff");
+        assert_eq!(indexed_hex(16), "#000000"); // cube origin
+        assert_eq!(indexed_hex(231), "#ffffff"); // cube corner
+        assert_eq!(indexed_hex(196), "#ff0000"); // pure red in the cube
+        assert_eq!(indexed_hex(232), "#080808"); // first grey ramp step
+        assert_eq!(indexed_hex(255), "#eeeeee"); // last grey ramp step
+    }
+
+    #[test]
+    fn inverse_swaps_fg_and_bg() {
+        let theme = Theme::from_name("dark").unwrap();
+        let cell = Cell {
+            ch: 'x',
+            fg: Color::Indexed(1),
+            bg: Color::Default,
+            bold: false,
+            inverse: true,
+        };
+        let (fg, bg) = cell_colors(&cell, &theme);
+        assert_eq!(fg, theme.bg); // default bg becomes the text colour
+        assert_eq!(bg, indexed_hex(1)); // red becomes the background
     }
 }

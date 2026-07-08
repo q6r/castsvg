@@ -72,7 +72,12 @@ fn render(args: RenderArgs) -> Result<()> {
         .with_context(|| format!("unknown theme '{}' (try 'dark' or 'light')", args.theme))?;
 
     let cast = cast::Cast::parse(&args.input)?;
-    let model = term::build_model(&cast, args.min_frame_ms, args.idle_cap_ms, args.end_pause_ms);
+    let model = term::build_model(
+        &cast,
+        args.min_frame_ms,
+        args.idle_cap_ms,
+        args.end_pause_ms,
+    );
 
     let opts = svg::Options {
         font_size: args.font_size,

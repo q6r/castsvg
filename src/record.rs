@@ -62,14 +62,20 @@ pub fn run(output: &Path, command: Option<&str>) -> Result<()> {
     // Slave handle is held by the child now; drop ours so EOF propagates on exit.
     drop(pair.slave);
 
-    let mut reader = pair.master.try_clone_reader().context("cloning PTY reader")?;
+    let mut reader = pair
+        .master
+        .try_clone_reader()
+        .context("cloning PTY reader")?;
     let mut writer = pair.master.take_writer().context("taking PTY writer")?;
 
     let mut cast_writer = cast::Writer::create(output, cols as usize, rows as usize)?;
     let start = Instant::now();
 
     crossterm::terminal::enable_raw_mode().ok();
-    eprintln!("castsvg: recording to {} — exit the shell to stop.", output.display());
+    eprintln!(
+        "castsvg: recording to {} — exit the shell to stop.",
+        output.display()
+    );
 
     // Forward our stdin to the PTY. Detached: it may block on read() when the
     // child exits, so we never join it — the process exits and takes it down.

@@ -93,7 +93,7 @@ impl Grid {
             // Scroll up one line.
             self.cells.drain(0..self.cols);
             let blank = self.blank();
-            self.cells.extend(std::iter::repeat(blank).take(self.cols));
+            self.cells.extend(std::iter::repeat_n(blank, self.cols));
             self.cy = self.rows - 1;
         }
     }
@@ -271,6 +271,59 @@ impl Grid {
     }
 }
 
+/// Replay a cast and slice it into animation frames.
+///
+/// * `min_frame_ms` coalesces bursts of output that are closer together than a
+///   single frame — no point emitting 500 near-identical frames for a fast
+///   `cat`.
+/// * `idle_cap_ms` compresses long pauses so a recording where you paused to
+///   think doesn't produce a 30-second dead SVG.
+pub fn build_model(cast: &Cast, min_frame_ms: f64, idle_cap_ms: f64, end_pause_ms: f64) -> Model {
+    let mut grid = Grid::new(cast.width, cast.height);
+    let mut parser = Parser::new();
+
+    // Pass 1: replay, taking a snapshot after each event on a remapped clock.
+    let mut snaps: Vec<(f64, Vec<Cell>)> = vec![(0.0, grid.snapshot())];
+    let mut clock = 0.0_f64;
+    let mut last_real = 0.0_f64;
+    for ev in &cast.events {
+        let delta = (ev.time - last_real).max(0.0);
+        last_real = ev.time;
+        clock += delta.min(idle_cap_ms / 1000.0);
+        for &byte in ev.data.as_bytes() {
+            parser.advance(&mut grid, byte);
+        }
+        snaps.push((clock * 1000.0, grid.snapshot()));
+    }
+
+    // Pass 2: coalesce snapshots closer than min_frame_ms into one frame.
+    let mut frames: Vec<Frame> = Vec::new();
+    let mut frame_start = snaps[0].0;
+    let mut current = snaps[0].1.clone();
+    for (t, cells) in snaps.iter().skip(1) {
+        if t - frame_start >= min_frame_ms {
+            frames.push(Frame {
+                cells: std::mem::replace(&mut current, cells.clone()),
+                duration_ms: t - frame_start,
+            });
+            frame_start = *t;
+        } else {
+            current = cells.clone();
+        }
+    }
+    // Final frame is held for a beat so the last state is readable before looping.
+    frames.push(Frame {
+        cells: current,
+        duration_ms: end_pause_ms.max(min_frame_ms),
+    });
+
+    Model {
+        cols: cast.width,
+        rows: cast.height,
+        frames,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -332,58 +385,5 @@ mod tests {
         // Only two rows: "top" scrolled off, leaving "mid" then "bot".
         assert_eq!(text_at(&g, 0), "mid");
         assert_eq!(text_at(&g, 1), "bot");
-    }
-}
-
-/// Replay a cast and slice it into animation frames.
-///
-/// * `min_frame_ms` coalesces bursts of output that are closer together than a
-///   single frame — no point emitting 500 near-identical frames for a fast
-///   `cat`.
-/// * `idle_cap_ms` compresses long pauses so a recording where you paused to
-///   think doesn't produce a 30-second dead SVG.
-pub fn build_model(cast: &Cast, min_frame_ms: f64, idle_cap_ms: f64, end_pause_ms: f64) -> Model {
-    let mut grid = Grid::new(cast.width, cast.height);
-    let mut parser = Parser::new();
-
-    // Pass 1: replay, taking a snapshot after each event on a remapped clock.
-    let mut snaps: Vec<(f64, Vec<Cell>)> = vec![(0.0, grid.snapshot())];
-    let mut clock = 0.0_f64;
-    let mut last_real = 0.0_f64;
-    for ev in &cast.events {
-        let delta = (ev.time - last_real).max(0.0);
-        last_real = ev.time;
-        clock += delta.min(idle_cap_ms / 1000.0);
-        for &byte in ev.data.as_bytes() {
-            parser.advance(&mut grid, byte);
-        }
-        snaps.push((clock * 1000.0, grid.snapshot()));
-    }
-
-    // Pass 2: coalesce snapshots closer than min_frame_ms into one frame.
-    let mut frames: Vec<Frame> = Vec::new();
-    let mut frame_start = snaps[0].0;
-    let mut current = snaps[0].1.clone();
-    for (t, cells) in snaps.iter().skip(1) {
-        if t - frame_start >= min_frame_ms {
-            frames.push(Frame {
-                cells: std::mem::replace(&mut current, cells.clone()),
-                duration_ms: t - frame_start,
-            });
-            frame_start = *t;
-        } else {
-            current = cells.clone();
-        }
-    }
-    // Final frame is held for a beat so the last state is readable before looping.
-    frames.push(Frame {
-        cells: current,
-        duration_ms: end_pause_ms.max(min_frame_ms),
-    });
-
-    Model {
-        cols: cast.width,
-        rows: cast.height,
-        frames,
     }
 }
