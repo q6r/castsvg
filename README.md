@@ -23,7 +23,7 @@ Because the recorder writes standard asciicast v2, it also renders files produce
 
 Pick whichever fits — all three give you the **same single binary**:
 
-**Download a prebuilt binary** (no toolchain needed) from the [Releases](https://github.com/YOUR_USER/castsvg/releases) page — macOS (Intel/Apple Silicon), Linux, Windows.
+**Download a prebuilt binary** (no toolchain needed) from the [Releases](https://github.com/q6r/castsvg/releases) page — macOS (Intel/Apple Silicon), Linux, Windows.
 
 **npm** (for Node users — downloads the prebuilt binary on install, no Rust required):
 
@@ -36,7 +36,7 @@ npm install -g castsvg
 ```sh
 cargo install castsvg
 # or from a clone:
-git clone https://github.com/YOUR_USER/castsvg && cd castsvg && cargo install --path .
+git clone https://github.com/q6r/castsvg && cd castsvg && cargo install --path .
 ```
 
 The release profile builds a stripped, LTO'd single binary (~500 KB, no dynamic runtime).

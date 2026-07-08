@@ -25,11 +25,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/YOUR_USER/castsvg.git"
+    "url": "git+https://github.com/q6r/castsvg.git"
   },
-  "homepage": "https://github.com/YOUR_USER/castsvg#readme",
+  "homepage": "https://github.com/q6r/castsvg#readme",
   "bugs": {
-    "url": "https://github.com/YOUR_USER/castsvg/issues"
+    "url": "https://github.com/q6r/castsvg/issues"
   },
   "license": "MIT",
   "engines": {

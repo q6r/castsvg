@@ -1,6 +1,6 @@
 # castsvg (npm)
 
-Record a terminal session, get a self-contained **animated SVG**. One static binary — this npm package just downloads the prebuilt [castsvg](https://github.com/YOUR_USER/castsvg) binary (written in Rust) for your platform. No Node runtime is bundled into the output; the SVG needs nothing but a browser.
+Record a terminal session, get a self-contained **animated SVG**. One static binary — this npm package just downloads the prebuilt [castsvg](https://github.com/q6r/castsvg) binary (written in Rust) for your platform. No Node runtime is bundled into the output; the SVG needs nothing but a browser.
 
 ```sh
 npm install -g castsvg
@@ -28,7 +28,7 @@ On install, a postinstall script downloads the matching prebuilt binary from the
 
 If your platform has no prebuilt binary, install Rust and run `cargo install castsvg` instead.
 
-Full documentation and source: **https://github.com/YOUR_USER/castsvg**
+Full documentation and source: **https://github.com/q6r/castsvg**
 
 ## License
 

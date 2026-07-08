@@ -8,7 +8,7 @@ const path = require("path");
 const https = require("https");
 const { version } = require("./package.json");
 
-const REPO = "YOUR_USER/castsvg";
+const REPO = "q6r/castsvg";
 
 // process.platform + process.arch -> Rust target triple used in the asset name.
 const TARGETS = {
