@@ -3,3 +3,7 @@
 *.svg
 !examples/demo.svg
 examples/preview.html
+
+# npm wrapper: the native binary is downloaded at install time, never committed.
+npm/binary/
+node_modules/
