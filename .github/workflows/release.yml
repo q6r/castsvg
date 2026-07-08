@@ -75,7 +75,15 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           CASTSVG_SKIP_DOWNLOAD: "1"
-        run: npm publish --access public
+        run: |
+          # Idempotent: re-tagging a version that's already on npm is a no-op,
+          # not a failure (npm versions are immutable).
+          VER=$(node -p "require('./package.json').version")
+          if npm view "castsvg@$VER" version >/dev/null 2>&1; then
+            echo "castsvg@$VER already published on npm — skipping."
+          else
+            npm publish --access public
+          fi
 
   # Publish the crate so `cargo install castsvg` works. Skipped if the token
   # isn't set.
@@ -99,4 +107,12 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish
+        run: |
+          # Idempotent: skip if this version is already on crates.io (immutable).
+          VER=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "User-Agent: castsvg-release" "https://crates.io/api/v1/crates/castsvg/$VER")
+          if [ "$CODE" = "200" ]; then
+            echo "castsvg $VER already published on crates.io — skipping."
+          else
+            cargo publish
+          fi
