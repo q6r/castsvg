@@ -1,5 +1,10 @@
 # castsvg
 
+[![CI](https://github.com/q6r/castsvg/actions/workflows/ci.yml/badge.svg)](https://github.com/q6r/castsvg/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/castsvg.svg)](https://crates.io/crates/castsvg)
+[![npm](https://img.shields.io/npm/v/castsvg.svg)](https://www.npmjs.com/package/castsvg)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **Record a terminal session, get a self-contained animated SVG.** One static Rust binary — no Node, no Python, no runtime, no external player. The output is a plain `.svg` that loops forever and drops straight into a README, a docs page, or an email.
 
 <p align="center">
